@@ -1,5 +1,6 @@
-#include <iostream>
-#include "CANTRIS.h"
+#include "state.h"
+#include "cstdlib"
+#include <assert.h>
 
 using namespace std;
 
@@ -28,9 +29,8 @@ int clean(vector< vector<int> > &board){
                 }                        
             }
         }
-        drop();     
+        drop(board);     
     }
-    checkgameover();
     return pts;
 }
 
@@ -48,14 +48,15 @@ void drop(vector< vector<int> > &board){
     }
 }
 
-CANTRIS_state::CANTRIS_state(vector< vector<int> > &board, int score, pair<int, int> *move, int next_to_move){
-    this.board = board;
-    this.score = score;
-    this.move = move;
-    this.next_to_move = next_to_move;
+State::State(vector< vector<int> > &board, int score, pair<int, int> *move, int next_to_move){
+    this->board = board;
+    this->score = score;
+    this->move = move;
+    this->next_to_move = next_to_move;
 } 
 
-bool CANTRIS_state::is_game_over(){
+bool State::is_game_over() const {
+    bool gameover = false;
     for(auto v :board[row-1])
         if (v == 0){
             gameover = true;
@@ -64,19 +65,19 @@ bool CANTRIS_state::is_game_over(){
     return gameover;
 }
 
-int CANTRIS_state::game_result(){
+int State::game_result() const {
     if (score > 0) return 1;
     else if (score < 0) return 2;
     else return 0;
 }
 
-void CANTRIS_state::is_move_legal(const pair<int, int> *move){
+void State::is_move_legal(pair<int, int> *move) const {
     int x = move->first, y = move->second;
     assert(0 <= x && x <= row - 1 && 0 <= y && y <= col - 1);
     assert(board[x][y] > 0);
 }
 
-MCTS_state CANTRIS_state::move(const pair<int, int> *move){
+State State::move_to_next_state(pair<int, int> *move) const {
     is_move_legal(move);
 
     int x = move->first, y = move->second;
@@ -87,14 +88,14 @@ MCTS_state CANTRIS_state::move(const pair<int, int> *move){
     int new_score = score;
     if (next_to_move == 1) new_score += pts;
     else new_score -= pts;
-    return CANTRIS_state(new_board, new_score, move, 3 - next_to_move);
+    return State(new_board, new_score, move, 3 - next_to_move);
 }
 
-vector< pair<int, int> > CANTRIS_state::get_legal_actions(){
-    vector< pair<int, int> > legal_actions_vector;
+vector< pair<int, int> *> State::get_legal_actions() const {
+    vector< pair<int, int> *> legal_actions_vector;
     for (int i = 0; i < row; ++i){
         for (int j = 0; i < col; ++j){
-            if (board[i][j] != 0) legal_actions_vector.push_back({i , j});
+            if (board[i][j] != 0) legal_actions_vector.push_back(new pair<int, int>(i, j));
         }
     }
     return legal_actions_vector;
