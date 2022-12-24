@@ -6,50 +6,39 @@
 
 using namespace std;
 
+double UCT(double p_n, double c_n, double win, 
+           double lose, double c_param);
+
 class MCTS_node {
+public:
     State *state;
     MCTS_node *parent;
-    vector<MCTS_node *> children;
+    vector<MCTS_node *> *children = new vector<MCTS_node *>();
+    vector< pair<int, int>* > *_untried_actions = nullptr;
     int n = 0, win = 0, lose = 0;
-public:
-    vector< pair<int, int> *> *_untried_actions = nullptr;
 
     MCTS_node(MCTS_node *parent, State *state);
     ~MCTS_node();
     void untried_actions();
-    MCTS_node expand();
+    MCTS_node* expand();
     bool is_terminal_node() const;
     int rollout() const;
-    void backpropagate(int reuslt);
-    bool is_fully_expanded() const;
-    MCTS_node best_child(double c_param = 1.) const;
+    void backpropagate(int result);
+    bool is_fully_expanded();
+    MCTS_node* best_child(double c_param) const;
     pair<int, int> rollout_policy(vector< pair<int, int> *> *possible_moves) const;
 };
 
-
-
 class MCTS_tree {
+public:
     MCTS_node *root;
-public:
-    MCTS_tree(MCTS_state *starting_state);
+
+    MCTS_tree(MCTS_node *root);
     ~MCTS_tree();
-    MCTS_node *select(double c=1.41);        // select child node to expand according to tree policy (UCT)
-    MCTS_node *select_best_child();          // select the most promising child of the root node
-    void grow_tree(int max_iter, double max_time_in_seconds);
-    void advance_tree(const MCTS_move *move);      // if the move is applicable advance the tree, else start over
-    unsigned int get_size() const;
-    const MCTS_state *get_current_state() const;
-    void print_stats() const;
+    MCTS_node* _tree_policy() const; //selects node to run rollout for
+    pair<int, int> best_action(
+        int *simulations_number, 
+        int *total_simulation_milliseconds);//one of the two must be nullptr
 };
 
-
-class MCTS_agent {                           // example of an agent based on the MCTS_tree. One can also use the tree directly.
-    MCTS_tree *tree;
-    int max_iter, max_seconds;
-public:
-    MCTS_agent(MCTS_state *starting_state, int max_iter = 100000, int max_seconds = 30);
-    ~MCTS_agent() = default;
-    const MCTS_move *genmove(const MCTS_move *enemy_move);
-    const MCTS_state *get_current_state() const;
-    void feedback() const { tree->print_stats(); }
-};
+#endif

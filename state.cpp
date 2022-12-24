@@ -48,7 +48,7 @@ void drop(vector< vector<int> > &board){
     }
 }
 
-State::State(vector< vector<int> > &board, int score, pair<int, int> *move, int next_to_move){
+State::State(vector< vector<int> > &board, int score, pair<int, int> &move, int next_to_move){
     this->board = board;
     this->score = score;
     this->move = move;
@@ -71,32 +71,40 @@ int State::game_result() const {
     else return 0;
 }
 
-void State::is_move_legal(pair<int, int> *move) const {
-    int x = move->first, y = move->second;
+void State::is_move_legal(pair<int, int> &move) const {
+    int x = move.first, y = move.second;
     assert(0 <= x && x <= row - 1 && 0 <= y && y <= col - 1);
     assert(board[x][y] > 0);
 }
 
-State State::move_to_next_state(pair<int, int> *move) const {
+State* State::move_to_next_state(pair<int, int> &move){
     is_move_legal(move);
 
-    int x = move->first, y = move->second;
+    int x = move.first, y = move.second;
     int pts = board[x][y];
-    vector< vector<int> > new_board = board;
-    new_board[x][y] = 0;
-    pts += clean(new_board);
-    int new_score = score;
-    if (next_to_move == 1) new_score += pts;
-    else new_score -= pts;
-    return State(new_board, new_score, move, 3 - next_to_move);
+    State *next_state = new State(board, score, move, 3 - next_to_move);
+    next_state->board[x][y] = 0;
+    drop(next_state->board);
+    if (!next_state->is_game_over())
+        pts += clean(next_state->board);
+    if (next_to_move == 1) next_state->score += pts;
+    else next_state->score -= pts;
+    return next_state;
 }
 
-vector< pair<int, int> *> State::get_legal_actions() const {
-    vector< pair<int, int> *> legal_actions_vector;
+void State::get_legal_actions(vector< pair<int, int>* >* legal_actions) const {
+    // vector< pair<int, int>* >* legal_actions_vector = new vector< pair<int, int>* >;
+
+    //release legal_actions
+    for (int i = 0; i < legal_actions->size(); ++i){
+        delete (*legal_actions)[i];
+    }
+    //empty legal_actions
+    legal_actions->clear();
+
     for (int i = 0; i < row; ++i){
-        for (int j = 0; i < col; ++j){
-            if (board[i][j] != 0) legal_actions_vector.push_back(new pair<int, int>(i, j));
+        for (int j = 0; j < col; ++j){
+            if (board[i][j] != 0) legal_actions->push_back(new pair<int, int>(i, j));
         }
     }
-    return legal_actions_vector;
-}123
+}

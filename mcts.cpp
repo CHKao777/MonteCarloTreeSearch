@@ -1,7 +1,18 @@
 #include "mcts.h"
+#include <random>
+#include <cmath>
+#include <assert.h>
+// #include <ctime>
+#include <chrono>
+#include <iostream>
 
 using namespace std;
 
+double UCT(double p_n, double c_n, double win, 
+           double lose, double c_param){
+    return (win - lose) / c_n + 
+            c_param * sqrt((2 * log(p_n) / c_n));
+}
 
 /*** MCTS NODE ***/
 MCTS_node::MCTS_node(MCTS_node *parent, State *state){
@@ -9,201 +20,165 @@ MCTS_node::MCTS_node(MCTS_node *parent, State *state){
     this->parent = parent;
 }
 
-// MCTS_node::~MCTS_node() {
-//     delete state;
-//     for (auto *child : children) {
-//         delete child;
-//     }
-//     delete children;
-//     while (!untried_actions->empty()) {
-//         delete untried_actions->front();    // if a move is here then it is not a part of a child node and needs to be deleted here
-//         untried_actions->pop();
-//     }
-//     delete untried_actions;
-// }
+MCTS_node::~MCTS_node() {
+    // delete state
+    delete state;
 
-void MCTS_node::untried_actions(){
-    if (!_untried_actions) _untried_actions = &(state->get_legal_actions());
+    // delete children
+    for (int i = 0; i < children->size(); ++i){
+        delete (*children)[i];
+    }
+    delete children;
+
+    // delete _untried_actions
+    if (_untried_actions){
+        for (int i = 0; i < _untried_actions->size(); ++i){
+            delete (*_untried_actions)[i];
+        }
+        delete _untried_actions;
+    }
 }
 
-MCTS_node MCTS_node::expand(){
+
+void MCTS_node::untried_actions(){
+    if (!_untried_actions) {
+        _untried_actions = new vector< pair<int, int>* >();
+        state->get_legal_actions(_untried_actions);
+    }
+}
+
+MCTS_node* MCTS_node::expand(){
     untried_actions();
     pair<int, int> *move = _untried_actions->back();
     _untried_actions->pop_back();
-    State *next_state = new State;
-    *next_state = state->move_to_next_state(move);
+    State *next_state = state->move_to_next_state(*move);
+    delete move;
     MCTS_node *child_node = new MCTS_node(this, next_state);
-    children.push_back(child_node);
-    return *child_node;
+    children->push_back(child_node);
+    return child_node;
 }
 
-bool MCTS_node::is_terminal_node(){
+bool MCTS_node::is_terminal_node() const{
     return state->is_game_over();
 }
 
-pair<int, int> MCTS_node::rollout_policy(vector< pair<int, int> *> *possible_moves){
-    return (*possible_moves)[]
+pair<int, int> MCTS_node::rollout_policy(vector< pair<int, int> *> *possible_moves) const{
+    random_device rd;
+    default_random_engine eng(rd());
+    uniform_int_distribution<int> distr(0, possible_moves->size() - 1);
+    return *((*possible_moves)[distr(eng)]);
 }
 
-int MCTS_node::rollout(){
+int MCTS_node::rollout() const{
     State *current_rollout_state = state;
-    while (!current_rollout_state->is_game_over()){
-        vector< pair<int, int> *> possible_moves = current_rollout_state->get_legal_actions();
+    State *state_to_delete;
+    vector< pair<int, int>* > *possible_moves = new vector< pair<int, int>* >();
 
+    int count = 0;
+    while (!current_rollout_state->is_game_over()){
+        current_rollout_state->get_legal_actions(possible_moves);
+        pair<int, int> move = rollout_policy(possible_moves);
+        state_to_delete = current_rollout_state;
+        current_rollout_state = current_rollout_state->move_to_next_state(move);
+
+        //delete new generated state
+        if (state_to_delete != state) delete state_to_delete;
     }
+
+    int game_result = current_rollout_state->game_result();
+
+    //delete new generated state
+    if (current_rollout_state != state) delete current_rollout_state;
+    //delete possible_moves
+    for (int i = 0; i < possible_moves->size(); ++i){
+        delete (*possible_moves)[i];
+    }
+    delete possible_moves;
+
+    return game_result;
 }
 
+void MCTS_node::backpropagate(int result){
+    ++n;
 
-/*** MCTS TREE ***/
-MCTS_node *MCTS_tree::select(double c) {
-    MCTS_node *node = root;
-    while (!node->is_terminal()) {
-        if (!node->is_fully_expanded()) {
-            return node;
-        } else {
-            node = node->select_best_child(c);
+    if (parent){
+        if (parent->state->next_to_move == result) 
+            ++win;
+        else if (result != 0) 
+            ++lose;
+    }
+
+    if (parent)
+        parent->backpropagate(result);
+}
+
+bool MCTS_node::is_fully_expanded(){
+    untried_actions();
+    return _untried_actions->size() == 0;
+}
+
+MCTS_node* MCTS_node::best_child(double c_param) const{
+    int best_child_index = 0;
+    double best_UCT_value = UCT(this->n, ((*children)[0])->n, 
+        ((*children)[0])->win, ((*children)[0])->lose, c_param);
+    for (int i = 1; i < children->size(); ++i){
+        double UCT_value = UCT(this->n, ((*children)[i])->n, 
+            ((*children)[i])->win, ((*children)[i])->lose, c_param);
+        if (UCT_value > best_UCT_value){
+            best_child_index = i;
+            best_UCT_value = UCT_value;
         }
     }
-    return node;
+    return (*children)[best_child_index];
 }
 
-MCTS_tree::MCTS_tree(MCTS_state *starting_state) {
-    assert(starting_state != NULL);
-    root = new MCTS_node(NULL, starting_state, NULL);
+/*** MCTS TREE ***/
+MCTS_tree::MCTS_tree(MCTS_node *root){
+    this->root = root;
 }
 
-MCTS_tree::~MCTS_tree() {
+MCTS_tree::~MCTS_tree(){
     delete root;
 }
 
-void MCTS_tree::grow_tree(int max_iter, double max_time_in_seconds) {
-    MCTS_node *node;
-    double dt;
-    #ifdef DEBUG
-    cout << "Growing tree..." << endl;
-    #endif
-    time_t start_t, now_t;
-    time(&start_t);
-    for (int i = 0 ; i < max_iter ; i++){
-        // select node to expand according to tree policy
-        node = select();
-        // expand it (this will perform a rollout and backpropagate the results)
-        node->expand();
-        // check if we need to stop
-        time(&now_t);
-        dt = difftime(now_t, start_t);
-        if (dt > max_time_in_seconds) {
-            #ifdef DEBUG
-            cout << "Early stopping: Made " << (i + 1) << " iterations in " << dt << " seconds." << endl;
-            #endif
-            break;
+MCTS_node* MCTS_tree::_tree_policy() const{
+    MCTS_node *current_node = root;
+    int count = 0;
+    while (!current_node->is_terminal_node()){
+        if (!current_node->is_fully_expanded())
+            return current_node->expand();
+        else
+            current_node = current_node->best_child(1.0);
+        count++;
+    }
+    return current_node;
+}
+
+pair<int, int> MCTS_tree::best_action(
+    int *simulations_number, 
+    int *total_simulation_milliseconds)
+{
+    if (!simulations_number){
+        assert(total_simulation_milliseconds);
+        chrono::milliseconds now = chrono::duration_cast< chrono::milliseconds >(
+            chrono::system_clock::now().time_since_epoch());
+        chrono::milliseconds end = now + 
+            chrono::milliseconds(*total_simulation_milliseconds);
+
+        while (chrono::duration_cast< chrono::milliseconds >(
+            chrono::system_clock::now().time_since_epoch()) < end){
+            MCTS_node* leaf_node = _tree_policy();
+            int rollout_result = leaf_node->rollout();
+            leaf_node->backpropagate(rollout_result);
         }
     }
-    #ifdef DEBUG
-    time(&now_t);
-    dt = difftime(now_t, start_t);
-    cout << "Finished in " << dt << " seconds." << endl;
-    #endif
-}
-
-unsigned int MCTS_tree::get_size() const {
-    return root->get_size();
-}
-
-const MCTS_move *MCTS_node::get_move() const {
-    return move;
-}
-
-const MCTS_state *MCTS_node::get_current_state() const { return state; }
-
-void MCTS_node::print_stats() const {
-    #define TOPK 10
-    if (number_of_simulations == 0) {
-        cout << "Tree not expanded yet" << endl;
-        return;
+    else{
+        assert(!total_simulation_milliseconds);
+        for (int i = 0; i < *simulations_number; ++i){
+            MCTS_node* leaf_node = _tree_policy();
+            int rollout_result = leaf_node->rollout();
+            leaf_node->backpropagate(rollout_result);
+        }
     }
-    cout << "___ INFO _______________________" << endl
-         << "Tree size: " << size << endl
-         << "Number of simulations: " << number_of_simulations << endl
-         << "Branching factor at root: " << children->size() << endl
-         << "Chances of P1 winning: " << setprecision(4) << 100.0 * (score / number_of_simulations) << "%" << endl;
-    // sort children based on winrate of player's turn for this node (!)
-    if (state->player1_turn()) {
-        std::sort(children->begin(), children->end(), [](const MCTS_node *n1, const MCTS_node *n2){
-            return n1->calculate_winrate(true) > n2->calculate_winrate(true);
-        });
-    } else {
-        std::sort(children->begin(), children->end(), [](const MCTS_node *n1, const MCTS_node *n2){
-            return n1->calculate_winrate(false) > n2->calculate_winrate(false);
-        });
-    }
-    // print TOPK of them along with their winrates
-    cout << "Best moves:" << endl;
-    for (int i = 0 ; i < children->size() && i < TOPK ; i++) {
-        cout << "  " << i + 1 << ". " << children->at(i)->move->sprint() << "  -->  "
-             << setprecision(4) << 100.0 * children->at(i)->calculate_winrate(state->player1_turn()) << "%" << endl;
-    }
-    cout << "________________________________" << endl;
+    return root->best_child(0.0)->state->move;
 }
-
-double MCTS_node::calculate_winrate(bool player1turn) const {
-    if (player1turn) {
-        return score / number_of_simulations;
-    } else {
-        return 1.0 - score / number_of_simulations;
-    }
-}
-
-void MCTS_tree::advance_tree(const MCTS_move *move) {
-    MCTS_node *old_root = root;
-    root = root->advance_tree(move);
-    delete old_root;       // this won't delete the new root since we have emptied old_root's children
-}
-
-const MCTS_state *MCTS_tree::get_current_state() const { return root->get_current_state(); }
-
-MCTS_node *MCTS_tree::select_best_child() {
-    return root->select_best_child(0.0);
-}
-
-void MCTS_tree::print_stats() const { root->print_stats(); }
-
-
-/*** MCTS agent ***/
-MCTS_agent::MCTS_agent(MCTS_state *starting_state, int max_iter, int max_seconds)
-: max_iter(max_iter), max_seconds(max_seconds) {
-    tree = new MCTS_tree(starting_state);
-}
-
-const MCTS_move *MCTS_agent::genmove(const MCTS_move *enemy_move) {
-    if (enemy_move != NULL) {
-        tree->advance_tree(enemy_move);
-    }
-    // If game ended from opponent move, we can't do anything
-    if (tree->get_current_state()->is_terminal()) {
-        return NULL;
-    }
-    #ifdef DEBUG
-    cout << "___ DEBUG ______________________" << endl
-         << "Growing tree..." << endl;
-    #endif
-    tree->grow_tree(max_iter, max_seconds);
-    #ifdef DEBUG
-    cout << "Tree size: " << tree->get_size() << endl
-         << "________________________________" << endl;
-    #endif
-    MCTS_node *best_child = tree->select_best_child();
-    if (best_child == NULL) {
-        cerr << "Warning: Tree root has no children! Possibly terminal node!" << endl;
-        return NULL;
-    }
-    const MCTS_move *best_move = best_child->get_move();
-    tree->advance_tree(best_move);
-    return best_move;
-}
-
-MCTS_agent::~MCTS_agent() {
-    delete tree;
-}
-
-const MCTS_state *MCTS_agent::get_current_state() const { return tree->get_current_state(); }
