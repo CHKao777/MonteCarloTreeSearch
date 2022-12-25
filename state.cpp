@@ -67,7 +67,7 @@ bool State::is_game_over() const {
 
 int State::game_result() const {
     if (score > 0) return 1;
-    else if (score < 0) return 2;
+    else if (score < 0) return -1;
     else return 0;
 }
 

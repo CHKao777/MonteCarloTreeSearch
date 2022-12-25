@@ -6,9 +6,12 @@
 #include <fstream>
 #include <random>
 #include <algorithm>
-#include <unistd.h>
+#include <getopt.h>
+#include <assert.h>
+#include <map>
 #include "state.h"
-#include "mcts.h"
+#include "node.h"
+#include "tree.h"
 
 
 using namespace std;
@@ -25,7 +28,8 @@ private:
     int mypts = 0;
     int oppopts = 0;
     int step = 0;
-    int mode = 0; //0:手動模式(manual_mode), 1:自動模擬(auto_mode)
+    // int mode = 0; //0:手動模式(manual_mode), 1:自動模擬(auto_mode)
+    char player1, player2;
 
 public:
     AI(){
@@ -58,13 +62,28 @@ public:
         board.clear();
     }
 
-    void set_manual_mode(){
-        mode = 0;
+    void set_player_mode(char player1, char player2){
+        if (player1 == 'm'){
+            this->player1 = player1;
+            this->player2 = player2;
+        }
+        else if (player2 == 'm'){
+            this->player1 = player2;
+            this->player2 = player1;
+        }
+        else{
+            this->player1 = player1;
+            this->player2 = player2;
+        }
     }
 
-    void set_auto_mode(){
-        mode = 1;
-    }
+    // void set_manual_mode(){
+    //     mode = 0;
+    // }
+
+    // void set_auto_mode(){
+    //     mode = 1;
+    // }
 
     bool checkstable(){
         for (int i=0 ; i<row;i++)
@@ -127,26 +146,44 @@ public:
         return pts;
     }
     
-    pair<int, int> make_decision(int simulations_number){
+    pair<int, int> make_decision(int *simulations_number, 
+        int *total_simulation_milliseconds, char mode, int score){
         /*
         #######################################################
         ##### This is the main part you need to implement #####
         #######################################################   */
 
         pair<int, int> move;
-        State *root_state = new State(board, mypts - oppopts, move, 1);  
+        State *root_state = new State(board, score, move, 1);  
         MCTS_node *root_node = new MCTS_node(nullptr, root_state);
-        MCTS_tree *tree = new MCTS_tree(root_node);
 
-        int total_simulation_milliseconds = 10000;
-        move = tree->best_action(&simulations_number, nullptr);
-        // move = tree->best_action(nullptr, &total_simulation_milliseconds);
-
-        delete tree;
-
-        return move;
-
-        // return rand_select();
+        if (mode == 'd')
+            return rand_select();
+        if (mode == 's'){
+            MCTS_tree_serial *tree = new MCTS_tree_serial(root_node);
+            move = tree->best_action(simulations_number, total_simulation_milliseconds);
+            delete tree;
+            return move;
+        }
+        if (mode == 'l'){
+            MCTS_tree_leaf *tree = new MCTS_tree_leaf(root_node);
+            move = tree->best_action(simulations_number, total_simulation_milliseconds);
+            delete tree;
+            return move;
+        }
+        assert(false);
+        // if (mode == 'r'){
+        //     MCTS_tree_root *tree = new MCTS_tree_root(root_node);
+        //     move = tree->best_action(simulations_number, total_simulation_milliseconds);
+        //     delete tree;
+        //     return move;
+        // }
+        // if (mode == 't'){
+        //     MCTS_tree_tree *tree = new MCTS_tree_tree(root_node);
+        //     move = tree->best_action(simulations_number, total_simulation_milliseconds);
+        //     delete tree;
+        //     return move;
+        // }
     }
 
     pair<int, int> rand_select(){
@@ -171,9 +208,9 @@ public:
         return pts;
     }
 
-    int start(int simulations_number){
+    int start(int *simulations_number, int *total_simulation_milliseconds){
         int result;
-        if (mode == 0){
+        if (player1 == 'm'){
             cout<<"Game start!"<<endl;
             pair<int, int> xy;
             int pts;
@@ -191,7 +228,7 @@ public:
                 cout<<"Turn"<<step<<endl;
                 if((step%2) == turn){
                     cout<<"It\'s your turn"<<endl;
-                    xy = make_decision(simulations_number);
+                    xy = make_decision(simulations_number, total_simulation_milliseconds, player2, mypts - oppopts);
                     cout << "your move is :"<<xy.first<<","<<xy.second << endl;
                     if(board[xy.first][xy.second]==0){
                         cout<<"illegal move";
@@ -236,7 +273,7 @@ public:
             }
         }
 		
-        if (mode == 1){
+        else{
             pair<int, int> xy;
             int pts;
 
@@ -247,7 +284,7 @@ public:
 
             while(!gameover){
                 if((step%2) == turn){
-                    xy = make_decision(simulations_number);
+                    xy = make_decision(simulations_number, total_simulation_milliseconds, player1, mypts - oppopts);
                     if(board[xy.first][xy.second]==0){
                         cout<<"illegal move";
                         exit(0);
@@ -256,7 +293,7 @@ public:
                     mypts += pts;
                 } 
                 else{
-                    xy = rand_select();
+                    xy = make_decision(simulations_number, total_simulation_milliseconds, player2, oppopts - mypts);
                     if(board[xy.first][xy.second]==0){
                         cout<<"illegal move";
                         exit(0);
@@ -294,40 +331,130 @@ public:
     }    
 };
 
+
 void usage(const char *progname)
 {
     printf("Usage: %s [options]\n", progname);
     printf("Program Options:\n");
-    printf("  -m        set mode(0 or 1, default:0), 0 for manual mode, 1 for auto mode\n");
-    printf("  -n        number of games(default:1000). If mode is set to 0, -n will be ignored\n");
-    printf("  -i        number of iterations per MCTS(default:250)\n");
-    printf("  -?        This message\n");
+    printf("  -m  --man             set one player to manual mode\n");
+    printf("  -d  --rand            set one player to random mode\n");
+    printf("  -s  --serial          set one player to serial MCTS mode\n");
+    printf("  -l  --leaf            set one player to tree parallelization MCTS mode\n");
+    printf("  -r  --root            set one player to root parallelization MCTS mode\n");
+    printf("  -t  --tree            set one player to tree parallelization MCTS mode\n");
+    printf("  -n  --game_num <INT>  number of games(default:1000). If one player is in manual mode, this argument will be ignored\n");
+    printf("  -i  --iter <INT>      number of iterations per MCTS. You have to provide -i or -x, but not both\n");
+    printf("  -x  --ms <INT>        execution time (in millisecond) per MCTS. You have to provide -i or -x, but not both\n");
+    printf("  -?  --help            This message\n");
 }
 
 int main(int argc, char **argv){
+    char player1 = 'z', player2 = 'z';
+    int game_n = 1000;
+    int *simulations_number = nullptr;
+    int *total_simulation_milliseconds = nullptr;
 
-    srand( time(NULL));
+    static struct option long_options[] = {
+    {"man", 0, 0, 'm'},
+    {"rand", 0, 0, 'd'},
+    {"serial", 0, 0, 's'},
+    {"leaf", 0, 0, 'l'},
+    {"root", 0, 0, 'r'},
+    {"tree", 0, 0, 't'},
+    {"game_num", 1, 0, 'n'},
+    {"ms", 1, 0, 'x'},
+    {"iter", 1, 0, 'i'},
+    {"help", 0, 0, '?'},
+    {0, 0, 0, 0}};
 
-    AI game;
-    game.set_manual_mode();
-    int mode = 0, game_n = 1000, simulations_number = 250;
+    map<char, string> map1 = {{'d', "random",},
+                                {'s', "serial",},
+                                {'l', "leaf",},
+                                {'r', "root",},
+                                {'t', "tree",}};
 
-    int opt;
-    while ((opt = getopt(argc, argv, "m:n:i:?")) != EOF)
+    int opt, temp1, temp2;
+    while ((opt = getopt_long(argc, argv, "mslrtn:i:x:?", long_options, NULL)) != EOF)
     {
         switch (opt)
         {
         case 'm':
         {
-            mode = atoi(optarg);
-            if (mode == 0)  game.set_manual_mode();
-            else if (mode == 1) game.set_auto_mode();
-            else {
-                fprintf(stderr, "Invalid mode index\n");
-                return 1;
+            if (player1 != 'z' && player2 != 'z'){
+                fprintf(stderr, "player setting more than 2 times\n");
+                return -1;
             }
+            if (player1 == 'm' || player2 == 'm'){
+                fprintf(stderr, "# of manual players must <= 1\n");
+                return -1;
+            }
+            if (player1 == 'z')
+                player1 = 'm';
+            else
+                player2 = 'm';
             break;
         }
+        case 'd':
+        {
+            if (player1 != 'z' && player2 != 'z'){
+                fprintf(stderr, "player setting more than 2 times\n");
+                return -1;
+            }
+            if (player1 == 'z')
+                player1 = 'd';
+            else
+                player2 = 'd';
+            break;
+        }   
+        case 's':
+        {
+            if (player1 != 'z' && player2 != 'z'){
+                fprintf(stderr, "player setting more than 2 times\n");
+                return -1;
+            }
+            if (player1 == 'z')
+                player1 = 's';
+            else
+                player2 = 's';
+            break;
+        }   
+        case 'l':
+        {
+            if (player1 != 'z' && player2 != 'z'){
+                fprintf(stderr, "player setting more than 2 times\n");
+                return -1;
+            }
+            if (player1 == 'z')
+                player1 = 'l';
+            else
+                player2 = 'l';
+            break;
+        }
+        case 'r':
+        {
+            if (player1 != 'z' && player2 != 'z'){
+                fprintf(stderr, "player setting more than 2 times\n");
+                return -1;
+            }
+            if (player1 == 'z')
+                player1 = 'r';
+            else
+                player2 = 'r';
+            break;
+        } 
+        case 't':
+        {
+            if (player1 != 'z' && player2 != 'z'){
+                fprintf(stderr, "player setting more than 2 times\n");
+                return -1;
+            }
+            if (player1 == 'z')
+                player1 = 't';
+            else
+                player2 = 't';
+            break;
+        }  
+
         case 'n':
         {
             game_n = atoi(optarg);
@@ -339,9 +466,28 @@ int main(int argc, char **argv){
         }
         case 'i':
         {
-            simulations_number = atoi(optarg);
-            if (simulations_number < 1){
+            if (total_simulation_milliseconds){
+                fprintf(stderr, "-i and -x can't be set simultaneously\n");
+                return -1;
+            }
+            temp1 = atoi(optarg);
+            simulations_number = &temp1;
+            if (*simulations_number < 1){
                 fprintf(stderr, "-i must >= 1\n");
+                return 1;
+            }
+            break;
+        }
+        case 'x':
+        {
+            if (simulations_number){
+                fprintf(stderr, "-i and -x can't be set simultaneously\n");
+                return -1;
+            }
+            temp2 = atoi(optarg);
+            total_simulation_milliseconds = &temp2;
+            if (*total_simulation_milliseconds < 1){
+                fprintf(stderr, "-x must >= 1\n");
                 return 1;
             }
             break;
@@ -353,8 +499,29 @@ int main(int argc, char **argv){
         }
     }
 
-    if (mode == 0){
-        game.start(simulations_number);
+    if (player1 == 'z' || player2 == 'z'){
+        fprintf(stderr, "players are set incorrectly\n");
+        return -1;
+    }
+
+    if (!simulations_number && !total_simulation_milliseconds){
+        fprintf(stderr, "You have to provide -i or -x\n");
+        return -1;
+    }
+
+    if (player1 == 'r' || player2 == 'r' || player1 == 't' || player2 == 't'){
+        cout << "player mode has not been implemented yet" << endl;
+        return 0;
+    }
+
+    srand( time(NULL));
+
+    AI game;
+
+    game.set_player_mode(player1, player2);
+
+    if (player1 == 'm' || player2 == 'm'){
+        game.start(simulations_number, total_simulation_milliseconds);
         return 0;
     }
 
@@ -366,7 +533,7 @@ int main(int argc, char **argv){
             cout << "\rprocessing:" << ((double) i) / game_n * 100 << "%";
             cout.flush();
         }
-        result = game.start(simulations_number);
+        result = game.start(simulations_number, total_simulation_milliseconds);
         game.init();
         if (result == 1) ++win;
         else if (result == -1) ++lose;
@@ -374,6 +541,7 @@ int main(int argc, char **argv){
     }
 
     cout << "\n-------result-------" << endl;
+    cout << map1[player1] << " vs. " << map1[player2] << endl;
     cout << "win rate:" << (double)win / (win + lose + tie) << endl;
     cout << "tie rate:" << (double)tie / (win + lose + tie) << endl;
     cout << "lose rate:" << (double)lose / (win + lose + tie) << endl;

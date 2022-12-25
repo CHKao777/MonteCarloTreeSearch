@@ -1,4 +1,4 @@
-#include "mcts.h"
+#include "node.h"
 #include <random>
 #include <cmath>
 #include <assert.h>
@@ -8,9 +8,9 @@
 
 using namespace std;
 
-double UCT(double p_n, double c_n, double win, 
-           double lose, double c_param){
-    return (win - lose) / c_n + 
+double UCT(double p_n, double c_n, double win_minus_lose, 
+           double c_param){
+    return win_minus_lose / c_n + 
             c_param * sqrt((2 * log(p_n) / c_n));
 }
 
@@ -98,18 +98,18 @@ int MCTS_node::rollout() const{
     return game_result;
 }
 
-void MCTS_node::backpropagate(int result){
-    ++n;
+void MCTS_node::backpropagate(int result, int count){
+    n += count;
 
     if (parent){
-        if (parent->state->next_to_move == result) 
-            ++win;
-        else if (result != 0) 
-            ++lose;
+        if (parent->state->next_to_move == 1)
+            win_minus_lose += result;
+        else if (parent->state->next_to_move == 2) 
+            win_minus_lose -= result;
     }
 
     if (parent)
-        parent->backpropagate(result);
+        parent->backpropagate(result, count);
 }
 
 bool MCTS_node::is_fully_expanded(){
@@ -120,65 +120,14 @@ bool MCTS_node::is_fully_expanded(){
 MCTS_node* MCTS_node::best_child(double c_param) const{
     int best_child_index = 0;
     double best_UCT_value = UCT(this->n, ((*children)[0])->n, 
-        ((*children)[0])->win, ((*children)[0])->lose, c_param);
+        ((*children)[0])->win_minus_lose, c_param);
     for (int i = 1; i < children->size(); ++i){
         double UCT_value = UCT(this->n, ((*children)[i])->n, 
-            ((*children)[i])->win, ((*children)[i])->lose, c_param);
+            ((*children)[i])->win_minus_lose, c_param);
         if (UCT_value > best_UCT_value){
             best_child_index = i;
             best_UCT_value = UCT_value;
         }
     }
     return (*children)[best_child_index];
-}
-
-/*** MCTS TREE ***/
-MCTS_tree::MCTS_tree(MCTS_node *root){
-    this->root = root;
-}
-
-MCTS_tree::~MCTS_tree(){
-    delete root;
-}
-
-MCTS_node* MCTS_tree::_tree_policy() const{
-    MCTS_node *current_node = root;
-    int count = 0;
-    while (!current_node->is_terminal_node()){
-        if (!current_node->is_fully_expanded())
-            return current_node->expand();
-        else
-            current_node = current_node->best_child(1.0);
-        count++;
-    }
-    return current_node;
-}
-
-pair<int, int> MCTS_tree::best_action(
-    int *simulations_number, 
-    int *total_simulation_milliseconds)
-{
-    if (!simulations_number){
-        assert(total_simulation_milliseconds);
-        chrono::milliseconds now = chrono::duration_cast< chrono::milliseconds >(
-            chrono::system_clock::now().time_since_epoch());
-        chrono::milliseconds end = now + 
-            chrono::milliseconds(*total_simulation_milliseconds);
-
-        while (chrono::duration_cast< chrono::milliseconds >(
-            chrono::system_clock::now().time_since_epoch()) < end){
-            MCTS_node* leaf_node = _tree_policy();
-            int rollout_result = leaf_node->rollout();
-            leaf_node->backpropagate(rollout_result);
-        }
-    }
-    else{
-        assert(!total_simulation_milliseconds);
-        for (int i = 0; i < *simulations_number; ++i){
-            MCTS_node* leaf_node = _tree_policy();
-            int rollout_result = leaf_node->rollout();
-            leaf_node->backpropagate(rollout_result);
-        }
-    }
-    return root->best_child(0.0)->state->move;
 }
