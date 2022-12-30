@@ -18,6 +18,9 @@ double UCT(double p_n, double c_n, double win_minus_lose,
 MCTS_node::MCTS_node(MCTS_node *parent, State *state){
     this->state = state;
     this->parent = parent;
+    n = 0;
+    win_minus_lose = 0;
+    omp_init_lock(&lock);
 }
 
 MCTS_node::~MCTS_node() {
@@ -121,9 +124,11 @@ MCTS_node* MCTS_node::best_child(double c_param) const{
     int best_child_index = 0;
     double best_UCT_value = UCT(this->n, ((*children)[0])->n, 
         ((*children)[0])->win_minus_lose, c_param);
+
     for (int i = 1; i < children->size(); ++i){
         double UCT_value = UCT(this->n, ((*children)[i])->n, 
             ((*children)[i])->win_minus_lose, c_param);
+        if (((*children)[i])->n == 0) cout << 123 << endl;
         if (UCT_value > best_UCT_value){
             best_child_index = i;
             best_UCT_value = UCT_value;

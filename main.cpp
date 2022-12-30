@@ -16,29 +16,59 @@
 
 using namespace std;
 
+int row = 14;
+int col = 7;
 
 class AI{
 private:
-    int row = 10;
-    int col = 5;
     bool gameover = false;
     vector< vector<int> > board = vector< vector<int> >(row, vector<int>(col, 0));;
+    vector< vector<int> > board_2 = vector< vector<int> >(row, vector<int>(col, 0));;
 
     int turn = 0;
     int mypts = 0;
     int oppopts = 0;
     int step = 0;
-    // int mode = 0; //0:手動模式(manual_mode), 1:自動模擬(auto_mode)
+
     char player1, player2;
 
 public:
     AI(){
-        init();
+        init_arguments();
+        // init_board();
     }
 
-    void init(){
+    void init_arguments(){
+        //init arguments
+        gameover = false;
+        mypts = 0;
+        oppopts = 0;
+        step = 0;
+    }
+
+    // void set_board(){
+    //     board = board_2;
+    // }
+
+    void read_board(int board_index){
+        ifstream input_file;
+        input_file.open("board/board_" + to_string(board_index));
+        assert (!input_file.fail());
+
+        int number;
+        for(auto &r:board)
+            for(auto &c:r){
+                input_file>>number;
+                c=(number);
+            }
+    }
+
+    void init_board(){
         //init board, randomly generate
-        vector<int> temp{1, 1, 2, 2, 3, 3, 4, 4, 5, 5};
+        vector<int> temp;
+        for (int i = 0; i < row; ++i){
+            temp.push_back(i / 2 + 1);
+        }
         while(true){
             for(int i = 0; i < col; ++i){
                 random_shuffle(temp.begin(), temp.end());
@@ -48,18 +78,16 @@ public:
             }            
             if (checkstable()) break;
         }
-            
-        //init arguments
-        gameover = false;
-        turn = 0;
-        mypts = 0;
-        oppopts = 0;
-        step = 0;
+        board_2 = board;
     }
-
+    
     ~AI(){
         for (auto v : board) v.clear();
         board.clear();
+    }
+
+    void exchange_turn(){
+        turn = 1 - turn;
     }
 
     void set_player_mode(char player1, char player2){
@@ -76,14 +104,6 @@ public:
             this->player2 = player2;
         }
     }
-
-    // void set_manual_mode(){
-    //     mode = 0;
-    // }
-
-    // void set_auto_mode(){
-    //     mode = 1;
-    // }
 
     bool checkstable(){
         for (int i=0 ; i<row;i++)
@@ -162,28 +182,31 @@ public:
         if (mode == 's'){
             MCTS_tree_serial *tree = new MCTS_tree_serial(root_node);
             move = tree->best_action(simulations_number, total_simulation_milliseconds);
+
             delete tree;
             return move;
         }
         if (mode == 'l'){
             MCTS_tree_leaf *tree = new MCTS_tree_leaf(root_node);
             move = tree->best_action(simulations_number, total_simulation_milliseconds);
+
             delete tree;
             return move;
         }
-        assert(false);
-        // if (mode == 'r'){
-        //     MCTS_tree_root *tree = new MCTS_tree_root(root_node);
-        //     move = tree->best_action(simulations_number, total_simulation_milliseconds);
-        //     delete tree;
-        //     return move;
-        // }
-        // if (mode == 't'){
-        //     MCTS_tree_tree *tree = new MCTS_tree_tree(root_node);
-        //     move = tree->best_action(simulations_number, total_simulation_milliseconds);
-        //     delete tree;
-        //     return move;
-        // }
+        if (mode == 'r'){
+            MCTS_tree_root *tree = new MCTS_tree_root(root_node);
+            move = tree->best_action(simulations_number, total_simulation_milliseconds);
+
+            delete tree;
+            return move;
+        }
+        if (mode == 't'){
+            MCTS_tree_tree *tree = new MCTS_tree_tree(root_node);
+            move = tree->best_action(simulations_number, total_simulation_milliseconds);
+
+            delete tree;
+            return move;
+        }
     }
 
     pair<int, int> rand_select(){
@@ -509,10 +532,10 @@ int main(int argc, char **argv){
         return -1;
     }
 
-    if (player1 == 'r' || player2 == 'r' || player1 == 't' || player2 == 't'){
-        cout << "player mode has not been implemented yet" << endl;
-        return 0;
-    }
+    // if (player1 == 't' || player2 == 't'){
+    //     cout << "player mode has not been implemented yet" << endl;
+    //     return 0;
+    // }
 
     srand( time(NULL));
 
@@ -533,8 +556,13 @@ int main(int argc, char **argv){
             cout << "\rprocessing:" << ((double) i) / game_n * 100 << "%";
             cout.flush();
         }
+
+        game.read_board(i / 2);
+        game.init_arguments();
+
         result = game.start(simulations_number, total_simulation_milliseconds);
-        game.init();
+        game.exchange_turn();
+
         if (result == 1) ++win;
         else if (result == -1) ++lose;
         else ++tie;

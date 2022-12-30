@@ -4,8 +4,11 @@
 
 using namespace std;
 
-#define row 10
-#define col 5
+// #define row 10
+// #define col 5
+
+extern int row;
+extern int col; 
 
 int clean(vector< vector<int> > &board){
     bool unstable = true;

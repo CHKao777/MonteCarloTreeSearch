@@ -3,6 +3,8 @@
 
 #include "state.h"
 #include <vector>
+#include <omp.h>
+#include <atomic> 
 
 using namespace std;
 
@@ -15,7 +17,9 @@ public:
     MCTS_node *parent;
     vector<MCTS_node *> *children = new vector<MCTS_node *>();
     vector< pair<int, int>* > *_untried_actions = nullptr;
-    int n = 0, win_minus_lose = 0;
+    atomic<int> n;
+    atomic<int> win_minus_lose;
+    omp_lock_t lock;
 
     MCTS_node(MCTS_node *parent, State *state);
     ~MCTS_node();
