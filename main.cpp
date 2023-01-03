@@ -6,6 +6,7 @@
 #include <chrono>
 #include <fstream>
 #include <random>
+#include <stdexcept>
 #include <algorithm>
 #include <getopt.h>
 #include <assert.h>
@@ -236,6 +237,7 @@ public:
             delete tree;
             return move;
         }
+        throw invalid_argument("player mode error");
     }
 
     pair<int, int> rand_select(){
