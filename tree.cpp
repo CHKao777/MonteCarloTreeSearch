@@ -2,7 +2,6 @@
 #include <random>
 #include <cmath>
 #include <assert.h>
-// #include <ctime>
 #include <chrono>
 #include <iostream>
 #include <vector>
@@ -10,9 +9,9 @@
 
 using namespace std;
 
-#define number_of_simulation_per_leaf 20 //for leaf parallelization
-#define number_of_tree 20 //for root parallelization
-#define number_of_thread 20 //for tree parallelization
+#define number_of_simulation_per_leaf 8 //for leaf parallelization
+#define number_of_tree 8//for root parallelization
+#define number_of_thread 8 //for tree parallelization
 
 /*** MCTS TREE SERIAL ***/
 MCTS_tree_serial::MCTS_tree_serial(MCTS_node *root){
@@ -26,8 +25,9 @@ MCTS_tree_serial::~MCTS_tree_serial(){
 MCTS_node* MCTS_tree_serial::_tree_policy() const{
     MCTS_node *current_node = root;
     while (!current_node->is_terminal_node()){
-        if (!current_node->is_fully_expanded())
+        if (!current_node->is_fully_expanded()){
             return current_node->expand();
+        }
         else
             current_node = current_node->best_child(1.0);
     }
@@ -78,8 +78,9 @@ MCTS_tree_leaf::~MCTS_tree_leaf(){
 MCTS_node* MCTS_tree_leaf::_tree_policy() const{
     MCTS_node *current_node = root;
     while (!current_node->is_terminal_node()){
-        if (!current_node->is_fully_expanded())
+        if (!current_node->is_fully_expanded()){
             return current_node->expand();
+        }
         else
             current_node = current_node->best_child(1.0);
     }
@@ -147,7 +148,6 @@ MCTS_tree_root::~MCTS_tree_root(){
 MCTS_node* MCTS_tree_root::_tree_policy() const{
     MCTS_node *current_node = root;
     while (!current_node->is_terminal_node()){
-        // 同一個node critical
         if (!current_node->is_fully_expanded()) 
             return current_node->expand();   
         else
@@ -196,6 +196,9 @@ pair<int, int> MCTS_tree_root::best_action(
     }
     else{
         assert(!total_simulation_milliseconds);
+        
+        // chrono::milliseconds start = chrono::duration_cast< chrono::milliseconds >(
+        //     chrono::system_clock::now().time_since_epoch());
 
         #pragma omp parallel for num_threads(number_of_tree) if (number_of_tree>1)
         for (int i = 0; i < number_of_tree; ++i){
@@ -209,20 +212,31 @@ pair<int, int> MCTS_tree_root::best_action(
                 }
             }
             else{
-                for (int j = 0; j < *simulations_number / number_of_tree; ++j){
+            //     chrono::milliseconds start = chrono::duration_cast< chrono::milliseconds >(
+            // chrono::system_clock::now().time_since_epoch());
+
+                int sleeve_count = *simulations_number / number_of_tree;
+                for (int j = 0; j < sleeve_count; ++j){
                     MCTS_node* leaf_node = (*tree_vector)[i - 1]->_tree_policy();
                     int rollout_result = leaf_node->rollout();
                     leaf_node->backpropagate(rollout_result, 1);
                 }
+
+            //     chrono::milliseconds end = chrono::duration_cast< chrono::milliseconds >(
+            // chrono::system_clock::now().time_since_epoch());
+
+            //     long long l_start = reinterpret_cast<long long&>(start);
+            //     long long l_end = reinterpret_cast<long long&>(end);
+            //      cout << 100000.0 / (l_end - l_start) * 1000 << endl;
             }
         }
+
+        //  chrono::milliseconds end = chrono::duration_cast< chrono::milliseconds >(
+        //     chrono::system_clock::now().time_since_epoch());
+        // long long l_start = reinterpret_cast<long long&>(start);
+        //     long long l_end = reinterpret_cast<long long&>(end);
+        //     cout << 100000.0 / (l_end - l_start) * 1000 << endl;
     }
-    
-    // cout << "----------------------" << endl;
-    // cout << this->root->n << endl;
-    // for (int i = 0; i < number_of_tree - 1; ++i){
-    //     cout << (*tree_vector)[i]->root->n << endl;
-    // }
 
     //sum up result
     //find the tree with max # of children
@@ -276,6 +290,7 @@ pair<int, int> MCTS_tree_root::best_action(
 // same as serial
 MCTS_tree_tree::MCTS_tree_tree(MCTS_node *root){
     this->root = root;
+    eng = new default_random_engine{random_device{}()};
 }
 
 // same as serial
@@ -285,6 +300,7 @@ MCTS_tree_tree::~MCTS_tree_tree(){
 
 MCTS_node* MCTS_tree_tree::_tree_policy() const{
     MCTS_node *current_node = root;
+    int count = 0;
     while (!current_node->is_terminal_node()){
         omp_set_lock(&current_node->lock);
         if (!current_node->is_fully_expanded()){
@@ -296,7 +312,7 @@ MCTS_node* MCTS_tree_tree::_tree_policy() const{
         omp_unset_lock(&current_node->lock);
 
         int max_index = -1;
-        int max_UCT_value = -1000000;
+        double max_UCT_value = -1000000;
         for (int i = 0; i < current_node->children->size(); ++i){
             if (((*current_node->children)[i])->n == 0) continue;
             double UCT_value = UCT(current_node->n, ((*current_node->children)[i])->n, 
@@ -310,10 +326,8 @@ MCTS_node* MCTS_tree_tree::_tree_policy() const{
             current_node = (*current_node->children)[max_index];
         }
         else{
-            random_device rd;
-            default_random_engine eng(rd());
             uniform_int_distribution<int> distr(0, current_node->children->size() - 1);
-            return (*current_node->children)[distr(eng)];
+            return (*current_node->children)[distr(*eng)];
         }
     }
     return current_node;
@@ -329,7 +343,6 @@ pair<int, int> MCTS_tree_tree::best_action(
             chrono::system_clock::now().time_since_epoch());
         chrono::milliseconds end = now + 
             chrono::milliseconds(*total_simulation_milliseconds);
-
         #pragma omp parallel num_threads(number_of_thread) if (number_of_thread>1)
         while (chrono::duration_cast< chrono::milliseconds >(
             

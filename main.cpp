@@ -3,6 +3,7 @@
 #include <vector>
 #include <cstdlib>
 #include <ctime>
+#include <chrono>
 #include <fstream>
 #include <random>
 #include <algorithm>
@@ -173,28 +174,64 @@ public:
             return rand_select();
         if (mode == 's'){
             MCTS_tree_serial *tree = new MCTS_tree_serial(root_node);
+
+            chrono::milliseconds start = chrono::duration_cast< chrono::milliseconds >(
+            chrono::system_clock::now().time_since_epoch());
             move = tree->best_action(simulations_number, total_simulation_milliseconds);
+            chrono::milliseconds end = chrono::duration_cast< chrono::milliseconds >(
+            chrono::system_clock::now().time_since_epoch());
+
+            long long l_start = reinterpret_cast<long long&>(start);
+            long long l_end = reinterpret_cast<long long&>(end);
+            // cout << 100000.0 / (l_end - l_start) * 1000 << endl;
 
             delete tree;
             return move;
         }
         if (mode == 'l'){
             MCTS_tree_leaf *tree = new MCTS_tree_leaf(root_node);
+            
+            chrono::milliseconds start = chrono::duration_cast< chrono::milliseconds >(
+            chrono::system_clock::now().time_since_epoch());
             move = tree->best_action(simulations_number, total_simulation_milliseconds);
+            chrono::milliseconds end = chrono::duration_cast< chrono::milliseconds >(
+            chrono::system_clock::now().time_since_epoch());
+
+            long long l_start = reinterpret_cast<long long&>(start);
+            long long l_end = reinterpret_cast<long long&>(end);
+            // cout << 100000.0 / (l_end - l_start) * 1000 / 11664.5<< endl;
 
             delete tree;
             return move;
         }
         if (mode == 'r'){
             MCTS_tree_root *tree = new MCTS_tree_root(root_node);
+            
+             chrono::milliseconds start = chrono::duration_cast< chrono::milliseconds >(
+            chrono::system_clock::now().time_since_epoch());
             move = tree->best_action(simulations_number, total_simulation_milliseconds);
+            chrono::milliseconds end = chrono::duration_cast< chrono::milliseconds >(
+            chrono::system_clock::now().time_since_epoch());
+
+            long long l_start = reinterpret_cast<long long&>(start);
+            long long l_end = reinterpret_cast<long long&>(end);
+            // cout << 100000.0 / (l_end - l_start) * 1000 / 11664.5<< endl;
 
             delete tree;
             return move;
         }
         if (mode == 't'){
             MCTS_tree_tree *tree = new MCTS_tree_tree(root_node);
+            
+             chrono::milliseconds start = chrono::duration_cast< chrono::milliseconds >(
+            chrono::system_clock::now().time_since_epoch());
             move = tree->best_action(simulations_number, total_simulation_milliseconds);
+            chrono::milliseconds end = chrono::duration_cast< chrono::milliseconds >(
+            chrono::system_clock::now().time_since_epoch());
+
+            long long l_start = reinterpret_cast<long long&>(start);
+            long long l_end = reinterpret_cast<long long&>(end);
+            // cout << 100000.0 / (l_end - l_start) * 1000 / 11664.5<< endl;
 
             delete tree;
             return move;
@@ -555,6 +592,14 @@ int main(int argc, char **argv){
     cout << "win rate:" << (double)win / (win + lose + tie) << endl;
     cout << "tie rate:" << (double)tie / (win + lose + tie) << endl;
     cout << "lose rate:" << (double)lose / (win + lose + tie) << endl;
+
+    // game.read_board(10);
+
+    // game.init_arguments();
+
+    // game.make_decision(simulations_number, total_simulation_milliseconds, player1, 0);
+
+
 
     return 0;
 }

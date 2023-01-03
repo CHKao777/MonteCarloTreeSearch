@@ -4,9 +4,6 @@
 
 using namespace std;
 
-// #define row 10
-// #define col 5
-
 extern int row;
 extern int col; 
 
@@ -96,8 +93,6 @@ State* State::move_to_next_state(pair<int, int> &move){
 }
 
 void State::get_legal_actions(vector< pair<int, int>* >* legal_actions) const {
-    // vector< pair<int, int>* >* legal_actions_vector = new vector< pair<int, int>* >;
-
     //release legal_actions
     for (int i = 0; i < legal_actions->size(); ++i){
         delete (*legal_actions)[i];

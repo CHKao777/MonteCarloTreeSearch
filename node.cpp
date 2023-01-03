@@ -2,11 +2,11 @@
 #include <random>
 #include <cmath>
 #include <assert.h>
-// #include <ctime>
 #include <chrono>
 #include <iostream>
 
 using namespace std;
+
 
 double UCT(double p_n, double c_n, double win_minus_lose, 
            double c_param){
@@ -20,6 +20,7 @@ MCTS_node::MCTS_node(MCTS_node *parent, State *state){
     this->parent = parent;
     n = 0;
     win_minus_lose = 0;
+    eng = new default_random_engine{random_device{}()};
     omp_init_lock(&lock);
 }
 
@@ -40,6 +41,9 @@ MCTS_node::~MCTS_node() {
         }
         delete _untried_actions;
     }
+
+    //delete default_random_engine
+    delete eng;
 }
 
 
@@ -66,10 +70,8 @@ bool MCTS_node::is_terminal_node() const{
 }
 
 pair<int, int> MCTS_node::rollout_policy(vector< pair<int, int> *> *possible_moves) const{
-    random_device rd;
-    default_random_engine eng(rd());
     uniform_int_distribution<int> distr(0, possible_moves->size() - 1);
-    return *((*possible_moves)[distr(eng)]);
+    return *((*possible_moves)[distr(*eng)]);
 }
 
 int MCTS_node::rollout() const{

@@ -4,6 +4,7 @@
 #include "state.h"
 #include "node.h"
 #include <omp.h>
+#include <random>
 
 using namespace std;
 
@@ -47,6 +48,7 @@ public:
 class MCTS_tree_tree {
 public:
     MCTS_node *root;
+    default_random_engine *eng;
 
     MCTS_tree_tree(MCTS_node *root);
     ~MCTS_tree_tree();

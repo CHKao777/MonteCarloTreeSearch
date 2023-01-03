@@ -3,6 +3,7 @@
 
 #include "state.h"
 #include <vector>
+#include <random>
 #include <omp.h>
 #include <atomic> 
 
@@ -15,6 +16,7 @@ class MCTS_node {
 public:
     State *state;
     MCTS_node *parent;
+    default_random_engine *eng;
     vector<MCTS_node *> *children = new vector<MCTS_node *>();
     vector< pair<int, int>* > *_untried_actions = nullptr;
     atomic<int> n;
