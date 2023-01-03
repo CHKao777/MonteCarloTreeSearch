@@ -1,6 +1,6 @@
 # Monte Carlo Tree Search
 ## Compile
-```g++ -o MCTS -fopenmp -O3 main.cpp state.cpp node.cpp tree.cpp```
+```make``` to generate MCTS executable
 ## Run
 ### Arguments
 ```./MCTS --help``` for help
