@@ -23,7 +23,6 @@ class AI{
 private:
     bool gameover = false;
     vector< vector<int> > board = vector< vector<int> >(row, vector<int>(col, 0));;
-    vector< vector<int> > board_2 = vector< vector<int> >(row, vector<int>(col, 0));;
 
     int turn = 0;
     int mypts = 0;
@@ -35,20 +34,14 @@ private:
 public:
     AI(){
         init_arguments();
-        // init_board();
     }
 
     void init_arguments(){
-        //init arguments
         gameover = false;
         mypts = 0;
         oppopts = 0;
         step = 0;
     }
-
-    // void set_board(){
-    //     board = board_2;
-    // }
 
     void read_board(int board_index){
         ifstream input_file;
@@ -78,7 +71,6 @@ public:
             }            
             if (checkstable()) break;
         }
-        board_2 = board;
     }
     
     ~AI(){
@@ -299,11 +291,6 @@ public:
         else{
             pair<int, int> xy;
             int pts;
-
-            random_device rd;
-            default_random_engine eng(rd());
-            uniform_int_distribution<int> distr(0, 1);
-            turn = distr(eng);
 
             while(!gameover){
                 if((step%2) == turn){
@@ -531,11 +518,6 @@ int main(int argc, char **argv){
         fprintf(stderr, "You have to provide -i or -x\n");
         return -1;
     }
-
-    // if (player1 == 't' || player2 == 't'){
-    //     cout << "player mode has not been implemented yet" << endl;
-    //     return 0;
-    // }
 
     srand( time(NULL));
 
