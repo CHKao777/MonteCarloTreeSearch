@@ -1,6 +1,6 @@
 .PHONY: all
-all: main.cpp state.cpp node.cpp tree.cpp
-	g++ -o MCTS -fopenmp -O3 main.cpp state.cpp node.cpp tree.cpp
+all: src/main.cpp src/state.cpp src/node.cpp src/tree.cpp
+	g++ -o MCTS -fopenmp -O3 src/main.cpp src/state.cpp src/node.cpp src/tree.cpp
 
 .PHONY: clean
 clean:

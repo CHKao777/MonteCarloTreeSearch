@@ -22,7 +22,7 @@ bool checkstable(vector< vector<int> > &board){
 }
 
 int main(){
-    string file_name("board/board_");
+    string file_name("../board/board_");
 
     vector< vector<int> > board = vector< vector<int> >(row, vector<int>(col, 0));;
 
